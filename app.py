@@ -19,12 +19,15 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-app.config["MAX_CONTENT_LENGTH"] = (
-    int(os.getenv("MAX_UPLOAD_MB", "100")) * 1024 * 1024
-)
+# Application configuration
+MAX_UPLOAD_MB = 100
+DB_NAME = "spark_ai"
+PORT = 5000
 
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+
+# Secrets — loaded only from environment variables
 MONGO_URI = os.getenv("MONGO_URI", "")
-DB_NAME = os.getenv("MONGO_DB", "spark_ai")
 
 if not MONGO_URI:
     raise RuntimeError(
@@ -514,6 +517,6 @@ def too_large(_):
 if __name__ == "__main__":
     app.run(
         host="127.0.0.1",
-        port=int(os.getenv("PORT", "5000")),
+        port=PORT,
         debug=True,
     )
