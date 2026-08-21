@@ -1,6 +1,6 @@
 Flask
-pymongo[srv]
+flask-cors
+pymongo
+cryptography
 python-dotenv
 requests
-Flask-Cors
-cryptography
