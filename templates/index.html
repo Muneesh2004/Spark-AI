@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <title>Spark AI</title>
+
+  <link rel="stylesheet" href="/static/style.css">
+
+  <!-- Markdown renderer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- HTML sanitizer -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- =========================
+       SIDEBAR
+       ========================= -->
+
+  <aside class="sidebar" id="sidebar">
+
+    <div class="brand">
+
+      <div class="brand-mark">✦</div>
+
+      <div>
+        <div class="brand-name">Spark AI</div>
+        <div class="brand-subtitle">Multi-model workspace</div>
+      </div>
+
+    </div>
+
+    <button class="new-chat" id="newChatBtn">
+      <span>＋</span>
+      New chat
+    </button>
+
+    <div class="sidebar-section-title">
+      Chats
+    </div>
+
+    <div class="chat-list" id="chatList"></div>
+
+    <div class="sidebar-bottom">
+
+      <button class="sidebar-action" id="modelsBtn">
+        ⚙ Model settings
+      </button>
+
+      <div class="status-row">
+
+        <span class="status-dot" id="statusDot"></span>
+
+        <span id="statusText">
+          Checking database…
+        </span>
+
+      </div>
+
+    </div>
+
+  </aside>
+
+
+  <!-- =========================
+       MAIN
+       ========================= -->
+
+  <main class="main">
+
+    <header class="topbar">
+
+      <button
+        class="icon-button mobile-only"
+        id="sidebarBtn"
+      >
+        ☰
+      </button>
+
+
+      <div class="model-picker-wrap">
+
+        <button
+          class="model-picker"
+          id="modelPicker"
+        >
+
+          <span class="model-light"></span>
+
+          <span id="activeModelName">
+            Select model
+          </span>
+
+          <span class="chevron">
+            ⌄
+          </span>
+
+        </button>
+
+
+        <div
+          class="model-menu"
+          id="modelMenu"
+        ></div>
+
+      </div>
+
+
+      <div class="top-actions">
+
+        <button
+          class="icon-button"
+          id="modelsTopBtn"
+          title="Manage models"
+        >
+          ⚙
+        </button>
+
+      </div>
+
+    </header>
+
+
+    <!-- =========================
+         CONVERSATION
+         ========================= -->
+
+    <section
+      class="conversation"
+      id="conversation"
+    >
+
+      <div
+        class="welcome"
+        id="welcome"
+      >
+
+        <div class="spark-logo">
+          ✦
+        </div>
+
+        <h1>
+          What can I help you build?
+        </h1>
+
+        <p>
+          Chat with your connected AI models, upload media,
+          and keep everything in one place.
+        </p>
+
+
+        <div class="quick-grid">
+
+          <button
+            class="quick-card"
+            data-prompt="Explain this concept clearly with a practical example."
+          >
+            <strong>Explain</strong>
+            <span>Break down a difficult concept</span>
+          </button>
+
+
+          <button
+            class="quick-card"
+            data-prompt="Help me design a production-ready software architecture."
+          >
+            <strong>Build</strong>
+            <span>Design a production-ready system</span>
+          </button>
+
+
+          <button
+            class="quick-card"
+            data-prompt="Review this code and identify bugs and improvements."
+          >
+            <strong>Review</strong>
+            <span>Find bugs and improve code</span>
+          </button>
+
+
+          <button
+            class="quick-card"
+            data-prompt="Give me 5 practical AI product ideas I could build."
+          >
+            <strong>Ideate</strong>
+            <span>Turn ideas into products</span>
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="messages"
+        id="messages"
+      ></div>
+
+    </section>
+
+
+    <!-- =========================
+         COMPOSER
+         ========================= -->
+
+    <section class="composer-area">
+
+      <div
+        class="attachment-preview"
+        id="attachmentPreview"
+      ></div>
+
+
+      <form
+        class="composer"
+        id="composer"
+      >
+
+        <input
+          type="file"
+          id="fileInput"
+          multiple
+          accept="image/*,video/*,audio/*"
+          hidden
+        >
+
+
+        <button
+          type="button"
+          class="composer-icon"
+          id="attachBtn"
+          title="Upload image, video or audio"
+        >
+          ＋
+        </button>
+
+
+        <textarea
+          id="messageInput"
+          rows="1"
+          placeholder="Message Spark AI…"
+        ></textarea>
+
+
+        <button
+          type="submit"
+          class="send-button"
+          id="sendBtn"
+          title="Send"
+        >
+          ↑
+        </button>
+
+      </form>
+
+
+      <div class="composer-hint">
+
+        <span>
+          Images, videos and audio supported
+        </span>
+
+        <span>•</span>
+
+        <span>
+          Your model API keys stay server-side
+        </span>
+
+      </div>
+
+    </section>
+
+  </main>
+
+</div>
+
+
+<!-- =========================
+     MODEL SETTINGS MODAL
+     ========================= -->
+
+<div
+  class="modal-backdrop hidden"
+  id="modalBackdrop"
+>
+
+  <div class="modal">
+
+    <div class="modal-header">
+
+      <div>
+
+        <h2>
+          Model settings
+        </h2>
+
+        <p>
+          Add any OpenAI-compatible model/provider.
+        </p>
+
+      </div>
+
+
+      <button
+        class="close-button"
+        id="closeModal"
+      >
+        ×
+      </button>
+
+    </div>
+
+
+    <form id="modelForm">
+
+      <div class="form-grid">
+
+        <label>
+          Display name
+
+          <input
+            name="name"
+            placeholder="Nemotron 3 Ultra"
+            required
+          >
+        </label>
+
+
+        <label>
+          Provider
+
+          <input
+            name="provider"
+            placeholder="NVIDIA / OpenRouter / Custom"
+            required
+          >
+        </label>
+
+
+        <label class="full">
+          Base URL
+
+          <input
+            name="base_url"
+            placeholder="https://provider.example/v1"
+            required
+          >
+
+          <small>
+            Usually the provider's API root,
+            without /chat/completions.
+          </small>
+
+        </label>
+
+
+        <label class="full">
+
+          API key
+
+          <div class="key-field">
+
+            <input
+              name="api_key"
+              type="password"
+              placeholder="sk-…"
+              required
+            >
+
+            <button
+              type="button"
+              id="toggleKey"
+            >
+              Show
+            </button>
+
+          </div>
+
+        </label>
+
+
+        <label>
+
+          Model ID
+
+          <input
+            name="model"
+            placeholder="model-name"
+            required
+          >
+
+        </label>
+
+
+        <div class="capabilities">
+
+          <span>
+            Capabilities
+          </span>
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="supports_vision"
+            >
+            Vision
+          </label>
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="supports_audio"
+            >
+            Audio
+          </label>
+
+          <label class="check">
+            <input
+              type="checkbox"
+              name="supports_video"
+            >
+            Video
+          </label>
+
+        </div>
+
+      </div>
+
+
+      <div class="modal-note">
+
+        API keys are stored in MongoDB.
+        For production, set
+        <code>APP_ENCRYPTION_KEY</code>
+        and encrypt keys at rest before exposing this app publicly.
+
+      </div>
+
+
+      <div class="modal-footer">
+
+        <button
+          type="button"
+          class="secondary"
+          id="cancelModel"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          class="primary"
+        >
+          Add model
+        </button>
+
+      </div>
+
+    </form>
+
+
+    <div class="configured-models">
+
+      <h3>
+        Configured models
+      </h3>
+
+      <div id="configuredModels"></div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<script src="/static/app.js"></script>
+
+</body>
+</html>
