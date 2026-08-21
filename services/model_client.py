@@ -1,4 +1,3 @@
-
 import base64
 import json
 import requests
@@ -11,44 +10,85 @@ def _data_url(file_bytes, mime):
 
 def _load_attachment(fs, attachment):
     from bson import ObjectId
+
     f = fs.get(ObjectId(attachment["id"]))
+
     return f.read(), attachment["mime"]
 
 
 def _build_messages(model, history, attachments, mongo_fs):
+    """
+    Build OpenAI-compatible messages.
+
+    Supports:
+    - normal text
+    - image attachments
+    - non-image attachment notices
+    """
+
     api_messages = [
-        {"role": item["role"], "content": item["content"]}
+        {
+            "role": item["role"],
+            "content": item["content"],
+        }
         for item in history
     ]
 
-    if attachments and api_messages and api_messages[-1]["role"] == "user":
+    if not api_messages:
+        return api_messages
+
+    if attachments and api_messages[-1]["role"] == "user":
+
         latest = api_messages[-1]
 
         if model.get("supports_vision"):
-            parts = [{
-                "type": "text",
-                "text": latest["content"] or "Please analyze the attached files."
-            }]
+
+            parts = [
+                {
+                    "type": "text",
+                    "text": (
+                        latest["content"]
+                        or "Please analyze the attached files."
+                    ),
+                }
+            ]
 
             for attachment in attachments:
-                raw, mime = _load_attachment(mongo_fs, attachment)
+
+                raw, mime = _load_attachment(
+                    mongo_fs,
+                    attachment
+                )
 
                 if mime.startswith("image/"):
-                    parts.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": _data_url(raw, mime)
+
+                    parts.append(
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": _data_url(
+                                    raw,
+                                    mime
+                                )
+                            },
                         }
-                    })
+                    )
+
                 else:
-                    parts.append({
-                        "type": "text",
-                        "text": (
-                            f"\n[Attachment: {attachment['name']} | {mime} | "
-                            f"{attachment['url']}]\n"
-                            "Direct analysis requires provider support for this media type."
-                        )
-                    })
+
+                    parts.append(
+                        {
+                            "type": "text",
+                            "text": (
+                                f"\n[Attachment: "
+                                f"{attachment['name']} | "
+                                f"{mime} | "
+                                f"{attachment['url']}]\n"
+                                "Direct analysis requires provider "
+                                "support for this media type."
+                            ),
+                        }
+                    )
 
             latest["content"] = parts
 
@@ -56,12 +96,16 @@ def _build_messages(model, history, attachments, mongo_fs):
 
 
 def _endpoint(model):
+    """
+    Return OpenAI-compatible chat completion endpoint.
+    """
+
     base_url = model["base_url"].rstrip("/")
-    return (
-        base_url
-        if base_url.endswith("/chat/completions")
-        else f"{base_url}/chat/completions"
-    )
+
+    if base_url.endswith("/chat/completions"):
+        return base_url
+
+    return f"{base_url}/chat/completions"
 
 
 def _headers(model):
@@ -72,21 +116,50 @@ def _headers(model):
     }
 
 
-def stream_model(model, history, attachments, mongo_fs):
+def stream_model(
+    model,
+    history,
+    attachments,
+    mongo_fs
+):
     """
     Streams an OpenAI-compatible chat completion.
 
-    Handles both:
-      data: {"choices":[{"delta":{"content":"hello"}}]}
-    and
-      data: {"choices":[{"message":{"content":"hello"}}]}
+    Supports:
 
-    It also handles plain JSON lines from providers that don't use SSE.
+        data: {
+            "choices": [
+                {
+                    "delta": {
+                        "content": "hello"
+                    }
+                }
+            ]
+        }
+
+    and:
+
+        data: {
+            "choices": [
+                {
+                    "message": {
+                        "content": "hello"
+                    }
+                }
+            ]
+        }
+
+    Also supports plain JSON lines.
     """
 
     payload = {
         "model": model["model"],
-        "messages": _build_messages(model, history, attachments, mongo_fs),
+        "messages": _build_messages(
+            model,
+            history,
+            attachments,
+            mongo_fs
+        ),
         "temperature": 0.7,
         "stream": True,
     }
@@ -101,49 +174,74 @@ def stream_model(model, history, attachments, mongo_fs):
 
     try:
         response.raise_for_status()
+
     except Exception:
+
         body = response.text[:2000]
+
         raise RuntimeError(
-            f"Provider returned HTTP {response.status_code}: {body}"
+            f"Provider returned HTTP "
+            f"{response.status_code}: {body}"
         )
 
-    for raw_line in response.iter_lines(decode_unicode=True):
-        if not raw_line:
-            continue
+    try:
 
-        line = raw_line.strip()
+        for raw_line in response.iter_lines(
+            decode_unicode=True
+        ):
 
-        if line.startswith("data:"):
-            line = line[5:].strip()
+            if not raw_line:
+                continue
 
-        if line == "[DONE]":
-            break
+            line = raw_line.strip()
 
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            # Some providers split data across multiple SSE lines.
-            continue
+            if line.startswith("data:"):
+                line = line[5:].strip()
 
-        choices = data.get("choices") or []
-        if not choices:
-            continue
+            if line == "[DONE]":
+                break
 
-        choice = choices[0]
+            try:
+                data = json.loads(line)
 
-        delta = choice.get("delta") or {}
-        content = delta.get("content")
+            except json.JSONDecodeError:
+                continue
 
-        if content is None:
-            message = choice.get("message") or {}
-            content = message.get("content")
+            choices = data.get("choices") or []
 
-        if isinstance(content, str) and content:
-            yield content
+            if not choices:
+                continue
+
+            choice = choices[0]
+
+            delta = choice.get("delta") or {}
+
+            content = delta.get("content")
+
+            if content is None:
+
+                message = choice.get("message") or {}
+
+                content = message.get("content")
+
+            if isinstance(content, str) and content:
+                yield content
+
+    finally:
+
+        response.close()
 
 
-def call_model(model, history, attachments, mongo_fs):
-    """Non-streaming compatibility wrapper."""
+def call_model(
+    model,
+    history,
+    attachments,
+    mongo_fs
+):
+    """
+    Non-streaming compatibility wrapper.
+    """
+
     return "".join(
         stream_model(
             model=model,
