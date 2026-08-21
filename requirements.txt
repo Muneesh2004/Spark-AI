@@ -1,6 +1,14 @@
 Flask
 flask-cors
 pymongo
-cryptography
+dnspython
+gridfs
 python-dotenv
+cryptography
 requests
+Werkzeug
+langchain
+langchain-core
+langchain-openai
+langgraph
+wikipedia
