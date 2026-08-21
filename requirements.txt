@@ -2,7 +2,6 @@ Flask
 flask-cors
 pymongo
 dnspython
-gridfs
 python-dotenv
 cryptography
 requests
